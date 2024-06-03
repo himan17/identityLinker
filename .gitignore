@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.env
+
+# Build artifacts (adjust based on your build tools)
+dist/
+build/
+coverage/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Testing files (if applicable)
+*.spec.ts
+*.test.ts
+
+# Logs
+*.log
+
+# IDE configuration files
+.idea/
+.vscode/
+
+# OS-specific temporary files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env*  # Matches all files starting with ".env"
+
+# Editor cache (optional)
+.eslintcache
+.stylelintcache
