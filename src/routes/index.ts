@@ -1,8 +1,8 @@
-import { Router } from 'express';
-import userRoutes from './userRoutes';
+import { Router } from "express";
+import identityRoutes from "./identityRoutes";
 
 const router = Router();
 
-router.use('/users', userRoutes);
+router.use("/contact", identityRoutes);
 
 export default router;

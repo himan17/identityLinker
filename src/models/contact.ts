@@ -1,7 +1,7 @@
 import { DataTypes } from "sequelize";
 import { db } from "../config/db";
 
-export const User = db.define(
+export const Contact = db.define(
   "Contact",
   {
     // Model attributes are defined here
@@ -18,6 +18,10 @@ export const User = db.define(
     },
     linkedId: {
       type: DataTypes.INTEGER,
+      references: {
+        model: "Contact",
+        key: "id",
+      },
     },
     linkPrecedence: {
       type: DataTypes.ENUM("primary", "secondary"),
@@ -32,3 +36,5 @@ export const User = db.define(
     // Other model options go here
   }
 );
+
+Contact.hasOne(Contact, { foreignKey: "linkedId" });

@@ -1,1 +1,1 @@
-export * from './identifyController';
+export * from './contact';
