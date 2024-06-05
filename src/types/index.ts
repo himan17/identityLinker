@@ -1,11 +1,11 @@
-declare type UserType = {
+export type UserType = {
   id: number;
   name: string;
   email: string;
   age: number;
 };
 
-declare type Contact = {
+export type ContactType = {
   id: number;
   phoneNumber: string;
   email: string;
@@ -16,19 +16,19 @@ declare type Contact = {
   updatedAt: Date;
 };
 
-declare interface IdentifyRequest {
+export interface IdentifyRequest {
   email?: string;
-  phoneNumber?: number;
+  phoneNumber?: string;
 }
 
-declare interface Identity {
+export interface Identity {
   primaryContactId: number;
   emails: string[];
   phoneNumbers: string[];
   secondaryContactIds: number[];
 }
 
-declare interface IdentifyResponse {
-  contact?: Contact;
+export interface IdentifyResponse {
+  contact?: ContactType;
   error?: string;
 }
