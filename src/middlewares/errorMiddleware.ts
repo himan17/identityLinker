@@ -1,6 +1,14 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from "express";
 
-export const errorMiddleware = (err: any, req: Request, res: Response, next: NextFunction) => {
+export const errorMiddleware = (
+  err: any,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   console.error(err.stack);
-  res.status(500).send('Something broke!');
+  res.status(500).json({
+    message: "Error occured",
+    errorMsg: err.message,
+  });
 };

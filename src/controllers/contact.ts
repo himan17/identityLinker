@@ -11,7 +11,6 @@ export const identityLinker = async (
   next: NextFunction
 ) => {
   try {
-    console.log("API endpoint hit");
     const reqBody: IdentifyRequest = req.body;
 
     const { email, phoneNumber } = reqBody;
@@ -20,7 +19,8 @@ export const identityLinker = async (
     if (!email && !phoneNumber) {
       throw new Error("Missing required fields: email or phoneNumber");
     }
-    // transaction for db queries
+
+    // transaction for db write/delete queries
     const t = await db.transaction();
 
     // check if Contacts exist for the email or phoneNumber
@@ -28,35 +28,51 @@ export const identityLinker = async (
       where: {
         [Op.or]: [{ email: email }, { phoneNumber: phoneNumber }],
       },
-      raw: true
-    }));
+      raw: true,
+    })) as any as ContactType[];
 
     // no contact - Create a new one
     if (contacts.length === 0) {
-      const newContact = await contactService.createNewContact(
-        t,
-        email,
-        phoneNumber
-      );
-      const links = await contactService.fetchIdentityLink(
-        newContact as any as ContactType,
-        t
-      );
-      res.status(200).json(links);
+      await contactService.createNewContact(t, email, phoneNumber);
+    } else {
+      // primary contacts
+      const primaryContacts = []; // 1 Contact or 2 Contacts(in case of new link)
+      let isEmailInContacts = false;
+      let isPhoneInContacts = false;
+
+      for (const c of contacts) {
+        if (c.linkPrecedence === "primary") {
+          primaryContacts.push(c);
+        }
+        if (c.email === email) isEmailInContacts = true;
+        if (c.phoneNumber === phoneNumber) isPhoneInContacts = true;
+      }
+
+      // new information
+      if (email && phoneNumber && (!isEmailInContacts || !isPhoneInContacts)) {
+        await contactService.createSecondaryContact(
+          email,
+          phoneNumber,
+          primaryContacts[0].id,
+          t
+        );
+      }
+      // check for primary -> secondary
+      else if (primaryContacts.length > 1) {
+        // create link with the older contact being primary contact
+        primaryContacts.sort(
+          (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+        );
+        await contactService.createContactLink(
+          primaryContacts[0].id,
+          primaryContacts[1].id
+        );
+      }
     }
 
-    // one contact - Fetch Link and return
-    else if (contacts.length === 1) {
-      const links = await contactService.fetchIdentityLink(
-        contacts[0] as any as ContactType,
-        t
-      );
-      res.status(200).json(links);
-    }
-    // two contact -
-    else {
-      // if email and phone matches to two different Contacts - chances for primary -> secondary
-    }
+    // fetch the links and return the desired response
+    const links = await contactService.fetchIdentityLink(email, phoneNumber);
+    res.status(200).json(links);
     await t.commit();
   } catch (er) {
     next(er);

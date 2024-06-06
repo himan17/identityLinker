@@ -1,7 +1,6 @@
-import { Transaction } from "sequelize";
+import { Op, Transaction } from "sequelize";
 import { Contact } from "../models/contact";
 import { ContactType } from "../types";
-import { db } from "../config/db";
 
 const createNewContact = async (
   t: Transaction,
@@ -20,61 +19,80 @@ const createNewContact = async (
   return contact.toJSON();
 };
 
-const fetchIdentityLink = async (contact: ContactType, t: Transaction) => {
-  // Given a node in the chain, trace back the entire chain
-  const linkedContacts: { contact: ContactType; isPrimary: boolean }[] = [];
+const fetchIdentityLink = async (email?: string, phoneNumber?: string) => {
+  const contacts = (await Contact.findAll({
+    where: {
+      [Op.or]: [{ email: email }, { phoneNumber: phoneNumber }],
+    },
+    raw: true,
+  })) as any as ContactType[];
 
-  const isPrimary = contact.linkPrecedence === "primary";
-  // check if primary
-  if (isPrimary) {
-    linkedContacts.push({ contact: contact, isPrimary: true });
-  }
-
-  // forward successors trace
-  let st = contact;
-  while (1) {
-    const searchId = st.id;
-
-    const nextContact = (
-      await Contact.findOne({
-        where: {
-          linkedId: searchId,
-        },
-      })
-    )?.toJSON();
-
-    if (!nextContact) {
-      break;
-    }
-
-    linkedContacts.push({
-      contact: nextContact,
-      isPrimary: nextContact.linkPrecedence === "primary",
-    });
-    st = nextContact;
-  }
-  // backward predecessors trace (only for non primary)
-  if (!isPrimary) {
-    while (1) {
-      const searchId = st.linkedId;
-
-      if (!searchId) {
-        break;
-      }
-
-      // fetch the row
-      const prevContact = (await Contact.findByPk(searchId))?.toJSON();
-
-      linkedContacts.push({
-        contact: prevContact,
-        isPrimary: prevContact.linkPrecedence === "primary",
-      });
-
-      st = prevContact;
+  // prepare the links response
+  let primaryContact: ContactType | undefined = undefined;
+  let secondaryEmails = [];
+  let secondaryContactIds = [];
+  let secondaryPhoneNumbers = [];
+  for (const c of contacts) {
+    if (c.linkPrecedence === "primary") {
+      primaryContact = c;
+    } else {
+      if (c.email) secondaryEmails.push(c.email);
+      if (c.phoneNumber) secondaryPhoneNumbers.push(c.phoneNumber);
+      secondaryContactIds.push(c.id);
     }
   }
 
-  
+  return {
+    contact: {
+      primaryContactId: primaryContact?.id,
+      emails: primaryContact?.email
+        ? [primaryContact?.email, ...secondaryEmails]
+        : secondaryEmails,
+      phoneNumbers: primaryContact?.phoneNumber
+        ? [primaryContact?.phoneNumber, ...secondaryPhoneNumbers]
+        : secondaryPhoneNumbers,
+      secondaryContactIds,
+    },
+  };
 };
 
-export default { createNewContact, fetchIdentityLink };
+const createSecondaryContact = async (
+  email: string,
+  phoneNumber: string,
+  primaryContactId: number,
+  t: Transaction
+) => {
+  await Contact.create(
+    {
+      email,
+      phoneNumber,
+      linkPrecedence: "secondary",
+      linkedId: primaryContactId,
+    },
+    { transaction: t }
+  );
+};
+
+const createContactLink = async (
+  primaryContactId: number,
+  secondaryContactId: number
+) => {
+  await Contact.update(
+    {
+      linkedId: primaryContactId,
+      linkedPrecendence: "secondary",
+    },
+    {
+      where: {
+        id: secondaryContactId,
+      },
+    }
+  );
+};
+
+export default {
+  createNewContact,
+  fetchIdentityLink,
+  createSecondaryContact,
+  createContactLink,
+};

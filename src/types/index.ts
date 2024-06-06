@@ -29,6 +29,6 @@ export interface Identity {
 }
 
 export interface IdentifyResponse {
-  contact?: ContactType;
+  contact?: Identity;
   error?: string;
 }
