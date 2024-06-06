@@ -20,38 +20,50 @@ const createNewContact = async (
 };
 
 const fetchIdentityLink = async (email?: string, phoneNumber?: string) => {
-  const contacts = (await Contact.findAll({
+  const matchedContacts = (await Contact.findAll({
     where: {
-      [Op.or]: [{ email: email }, { phoneNumber: phoneNumber }],
+      [Op.or]: [{ email }, { phoneNumber }],
     },
     raw: true,
   })) as any as ContactType[];
 
-  // prepare the links response
-  let primaryContact: ContactType | undefined = undefined;
-  let secondaryEmails = [];
-  let secondaryContactIds = [];
-  let secondaryPhoneNumbers = [];
-  for (const c of contacts) {
-    if (c.linkPrecedence === "primary") {
-      primaryContact = c;
-    } else {
-      if (c.email) secondaryEmails.push(c.email);
-      if (c.phoneNumber) secondaryPhoneNumbers.push(c.phoneNumber);
-      secondaryContactIds.push(c.id);
-    }
-  }
+  const contact = matchedContacts[0];
+  const isPrimary = contact.linkPrecedence === "primary";
+  const primaryId = isPrimary ? contact.id : contact.linkedId;
+
+  const contacts = (await Contact.findAll({
+    where: {
+      [Op.or]: [{ linkedId: primaryId }, { id: primaryId }],
+    },
+    raw: true,
+  })) as any as ContactType[];
+
+  const primaryContact = contacts.find((c) => c.id === primaryId);
+  const secondaryContacts = contacts.filter(
+    (c) => c.linkPrecedence !== "primary"
+  );
+
+  const emails = new Set<string>(
+    [primaryContact?.email, ...secondaryContacts.map((c) => c.email)].filter(
+      (email): email is string => !!email
+    )
+  );
+  const phoneNumbers = new Set<string>(
+    [
+      primaryContact?.phoneNumber,
+      ...secondaryContacts.map((c) => c.phoneNumber),
+    ].filter((phone): phone is string => !!phone)
+  );
+  const secondaryContactIds = new Set<number>(
+    secondaryContacts.map((c) => c.id)
+  );
 
   return {
     contact: {
       primaryContactId: primaryContact?.id,
-      emails: primaryContact?.email
-        ? [primaryContact?.email, ...secondaryEmails]
-        : secondaryEmails,
-      phoneNumbers: primaryContact?.phoneNumber
-        ? [primaryContact?.phoneNumber, ...secondaryPhoneNumbers]
-        : secondaryPhoneNumbers,
-      secondaryContactIds,
+      emails: Array.from(emails),
+      phoneNumbers: Array.from(phoneNumbers),
+      secondaryContactIds: Array.from(secondaryContactIds),
     },
   };
 };
@@ -80,7 +92,7 @@ const createContactLink = async (
   await Contact.update(
     {
       linkedId: primaryContactId,
-      linkedPrecendence: "secondary",
+      linkPrecedence: "secondary",
     },
     {
       where: {

@@ -69,11 +69,11 @@ export const identityLinker = async (
         );
       }
     }
+    await t.commit();
 
     // fetch the links and return the desired response
     const links = await contactService.fetchIdentityLink(email, phoneNumber);
     res.status(200).json(links);
-    await t.commit();
   } catch (er) {
     next(er);
   }
